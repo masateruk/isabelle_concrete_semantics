@@ -483,32 +483,28 @@ fun comp :: "aexp \<Rightarrow> reg \<Rightarrow> instr list" where
 "comp (V v) r = [LD v r]" |
 "comp (Plus a1 a2) r = (comp a1 r) @ (comp a2 (r + 1)) @ [ADD r (r + 1)]"
 
-lemma [simp]:"exec is1 s rs r = (let rs1 = execn is1 s rs in rs1(r))"
+lemma exec_execn:"exec is1 s rs r = (let rs1 = execn is1 s rs in rs1(r))"
 apply(induction is1 arbitrary: rs)
 apply(auto)  
 done
     
-lemma [simp]:"(execn (is1 @ is2) s rs) = (execn is2 s (execn is1 s rs))"
+lemma execn_dist_append:"(execn (is1 @ is2) s rs) = (execn is2 s (execn is1 s rs))"
 apply(induction is1 arbitrary: rs)
 apply(auto)
 done
 
-lemma [simp]:"(execn ((comp a r) @ is2) s rs) = (execn is2 s (execn (comp a r) s rs))"
-apply(auto)
+lemma execn_comp_append:"(execn ((comp a r) @ is2) s rs) = (execn is2 s (execn (comp a r) s rs))"
+apply(auto simp add:execn_dist_append)
 done
       
-lemma [simp]:"(exec ((comp a r) @ is1) s rs r) = (exec is1 s (execn (comp a r) s rs) r)"
-apply(auto)
-done
-
-lemma [simp]:"r1 > r \<Longrightarrow> execn (comp a r1) s rs r = rs(r)"
+lemma comp_right_rs_not_changed:"r1 > r \<Longrightarrow> execn (comp a r1) s rs r = rs(r)"
 apply(induction a arbitrary: r r1 rs)
-apply(auto)
+apply(auto simp add:execn_dist_append)
 done
     
 theorem "exec (comp a r) s rs r = aval a s"
 apply(induction a arbitrary: r rs)
-apply(auto)
+apply(auto simp add:exec_execn execn_comp_append comp_right_rs_not_changed)
 done
     
 text{*
