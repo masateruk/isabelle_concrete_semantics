@@ -456,7 +456,9 @@ the result is the new register state: *}
 type_synonym rstate = "reg \<Rightarrow> val"
 
 fun exec1 :: "instr \<Rightarrow> state \<Rightarrow> rstate \<Rightarrow> rstate" where
-(* your definition/proof here *)
+"exec1 (LDI i r) s rs = rs(r := i)" |
+"exec1 (LD x r) s rs = rs(r := s(x))" |
+"exec1 (ADD r1 r2) s rs = rs(r1 := rs(r1) + rs(r2))"
 
 text{*
 Define the execution @{const[source] exec} of a list of instructions as for the stack machine.
@@ -468,9 +470,47 @@ for intermediate results, the ones @{text "< r"} should be left alone.
 Define the compiler and prove it correct:
 *}
 
-theorem "exec (comp a r) s rs r = aval a s"
-(* your definition/proof here *)
+fun execn :: "instr list \<Rightarrow> state \<Rightarrow> rstate \<Rightarrow> rstate" where
+"execn [] s rs = rs" |
+"execn (i#is) s rs = execn is s (exec1 i s rs)"
+  
+fun exec :: "instr list \<Rightarrow> state \<Rightarrow> rstate \<Rightarrow> reg \<Rightarrow> val" where
+"exec [] s rs r = rs(r)" |
+"exec (i#is) s rs r = exec is s (exec1 i s rs) r"
 
+fun comp :: "aexp \<Rightarrow> reg \<Rightarrow> instr list" where
+"comp (N n) r = [LDI n r]" |
+"comp (V v) r = [LD v r]" |
+"comp (Plus a1 a2) r = (comp a1 r) @ (comp a2 (r + 1)) @ [ADD r (r + 1)]"
+
+lemma [simp]:"exec is1 s rs r = (let rs1 = execn is1 s rs in rs1(r))"
+apply(induction is1 arbitrary: rs)
+apply(auto)  
+done
+    
+lemma [simp]:"(execn (is1 @ is2) s rs) = (execn is2 s (execn is1 s rs))"
+apply(induction is1 arbitrary: rs)
+apply(auto)
+done
+
+lemma [simp]:"(execn ((comp a r) @ is2) s rs) = (execn is2 s (execn (comp a r) s rs))"
+apply(auto)
+done
+      
+lemma [simp]:"(exec ((comp a r) @ is1) s rs r) = (exec is1 s (execn (comp a r) s rs) r)"
+apply(auto)
+done
+
+lemma [simp]:"r1 > r \<Longrightarrow> execn (comp a r1) s rs r = rs(r)"
+apply(induction a arbitrary: r r1 rs)
+apply(auto)
+done
+    
+theorem "exec (comp a r) s rs r = aval a s"
+apply(induction a arbitrary: r rs)
+apply(auto)
+done
+    
 text{*
 \endexercise
 
