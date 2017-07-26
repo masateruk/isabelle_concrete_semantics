@@ -497,14 +497,14 @@ lemma execn_comp_append:"(execn ((comp a r) @ is2) s rs) = (execn is2 s (execn (
 apply(auto simp add:execn_dist_append)
 done
       
-lemma comp_right_rs_not_changed:"r1 > r \<Longrightarrow> execn (comp a r1) s rs r = rs(r)"
+lemma comp_left_rs_not_changed:"r1 > r \<Longrightarrow> execn (comp a r1) s rs r = rs(r)"
 apply(induction a arbitrary: r r1 rs)
 apply(auto simp add:execn_dist_append)
 done
     
 theorem "exec (comp a r) s rs r = aval a s"
 apply(induction a arbitrary: r rs)
-apply(auto simp add:exec_execn execn_comp_append comp_right_rs_not_changed)
+apply(auto simp add:exec_execn execn_comp_append comp_left_rs_not_changed)
 done
     
 text{*
@@ -526,7 +526,19 @@ adds the value in register @{text r} to the value in register 0;
 *}
 
 fun exec01 :: "instr0 \<Rightarrow> state \<Rightarrow> rstate \<Rightarrow> rstate" where
-(* your definition/proof here *)
+"exec01 (LDI0 x) s rs = rs(0 := x)" |
+"exec01 (LD0 v) s rs = rs(0 := s(v))" |
+"exec01 (MV0 r) s rs = rs(r := rs(0))" |
+"exec01 (ADD0 r) s rs = rs(0 := rs(0) + rs(r))"
+
+fun exec0 :: "instr0 list \<Rightarrow> state \<Rightarrow> rstate \<Rightarrow> reg \<Rightarrow> val" where
+"exec0 [] s rs r = rs(r)" |
+"exec0 (is#rest) s rs r = exec0 rest s (exec01 is s rs) r"
+
+fun comp0 :: "aexp \<Rightarrow> reg \<Rightarrow> instr0 list" where
+"comp0 (N n) r = [LDI0 n, MV0 r]" |
+"comp0 (V v) r = [LD0 v, MV0 r]" |
+"comp0 (Plus a1 a2) r = (comp0 a1 (r + 1)) @ (comp0 a2 (r + 2)) @ [ADD0 (r + 1), MV0 r]"
 
 text{*
 and @{const exec0} for instruction lists.
@@ -538,8 +550,60 @@ for intermediate results, the ones @{text "\<le> r"} should be left alone
 (with the exception of 0). Define the compiler and prove it correct:
 *}
 
+fun exec0n :: "instr0 list \<Rightarrow> state \<Rightarrow> rstate \<Rightarrow> rstate" where
+"exec0n [] s rs = rs" |
+"exec0n (i#is) s rs = exec0n is s (exec01 i s rs)"
+
+lemma exec0_exec0n[simp]:"exec0 is1 s rs r = (let rs1 = exec0n is1 s rs in rs1(r))"
+apply(induction is1 arbitrary: rs)
+apply(auto)  
+done
+
+lemma exec0n_dist_append:"(exec0n (is1 @ is2) s rs) = (exec0n is2 s (exec0n is1 s rs))"
+apply(induction is1 arbitrary: rs)
+apply(auto)
+done
+
+lemma exec0n_comp0_append:"(exec0n ((comp0 a r) @ is2) s rs) = (exec0n is2 s (exec0n (comp0 a r) s rs))"
+apply(auto simp add:exec0n_dist_append)
+done
+      
+lemma comp0_left_rs_not_changed:"r1 > r \<and> r > 0 \<Longrightarrow> exec0n (comp0 a r1) s rs r = rs(r)"
+apply(induction a arbitrary: r r1 rs)
+apply(auto simp add:exec0n_dist_append)
+done
+
+lemma exec0_comp0_rsr_is_equal_rs0:"exec0 (comp0 a r) s rs r = exec0 (comp0 a r) s rs 0"
+apply(induction a arbitrary: r rs)
+apply(auto simp add:exec0n_dist_append)
+done
+
+lemma exec0n_comp0_rs0_is_equal_rsr:"exec0n (comp0 a r) s rs 0 = exec0n (comp0 a r) s rs r"
+apply(induction a arbitrary: r rs)
+apply(auto simp add:exec0n_dist_append)
+done
+
+lemma exec0n_cond:"(exec0n (comp0 a2 r2) s (exec0n (comp0 a1 r1) s rs1) 0 = exec0n (comp0 a2 r2) s (exec0n (comp0 a1 r1) s rs2) 0) \<and>
+       (exec0n (comp0 a1 r1) s rs1 r1 = exec0n (comp0 a1 r1) s rs2 r1) \<Longrightarrow>
+       exec0n (comp0 a2 r2) s (exec0n (comp0 a1 r1) s rs1) 0 +
+       exec0n (comp0 a1 r1) s rs1 r1 =
+       exec0n (comp0 a2 r2) s (exec0n (comp0 a1 r1) s rs2) 0 +
+       exec0n (comp0 a1 r1) s rs2 r1"
+apply(auto)  
+done
+
+lemma exec0n_rs1_arbitrary: "exec0n (comp0 a r) s rs1 r = exec0n (comp0 a r) s rs2 r"
+apply(induction a arbitrary: r rs1 rs2)
+apply(auto simp add:exec0n_dist_append exec0n_comp0_append comp0_left_rs_not_changed)    
+apply(subst exec0n_cond)
+apply(auto simp add: exec0n_comp0_rs0_is_equal_rsr)
+done
+    
 theorem "exec0 (comp0 a r) s rs 0 = aval a s"
-(* your definition/proof here *)
+apply(induction a arbitrary: r rs)
+apply(auto simp add:exec0n_dist_append exec0n_comp0_append comp0_left_rs_not_changed)    
+apply(auto simp add:exec0n_comp0_rs0_is_equal_rsr)    
+done
 
 text{*
 \endexercise
