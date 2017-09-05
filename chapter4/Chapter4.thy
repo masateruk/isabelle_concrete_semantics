@@ -2,10 +2,6 @@ theory Chapter4
 imports "~~/src/HOL/IMP/ASM"
 begin
 
-inductive star :: "('a \<Rightarrow> 'a \<Rightarrow> bool) \<Rightarrow> 'a \<Rightarrow> 'a \<Rightarrow> bool"  for r where
-refl:  "star r x x" |
-step:  "r x y \<Longrightarrow> star r y z \<Longrightarrow> star r x z"
-
 text{*
 \section*{Chapter 4}
 
@@ -81,13 +77,26 @@ Formalize the following definition of palindromes
 as an inductive predicate
 *}
 
+inductive star :: "('a \<Rightarrow> 'a \<Rightarrow> bool) \<Rightarrow> 'a \<Rightarrow> 'a \<Rightarrow> bool"  for r where
+refl:  "star r x x" |
+step:  "r x y \<Longrightarrow> star r y z \<Longrightarrow> star r x z"
+
+thm conjI  
+thm refl  
+thm refl[of "a"]
+thm conjI [OF refl[of "a"] refl[of "b"]]
+  
 inductive palindrome :: "'a list \<Rightarrow> bool" where
-(* your definition/proof here *)
+base0: "palindrome []" |
+base1: "palindrome [x]" |
+cons_append: "palindrome x \<Longrightarrow> palindrome (a # x @ [a])"
 
 text {* and prove *}
 
 lemma "palindrome xs \<Longrightarrow> rev xs = xs"
-(* your definition/proof here *)
+apply(induction xs rule: palindrome.induct)
+apply(auto)
+done    
 
 text{*
 \endexercise
